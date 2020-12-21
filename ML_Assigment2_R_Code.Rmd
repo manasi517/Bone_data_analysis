@@ -1,0 +1,143 @@
+---
+title: "ML Assignment2"
+author: "Manasi Tondulkar | Student number : 20250123"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Following libraries are used for data cleaning, pre-processing and for different classifiers.
+```{r imports, message = FALSE, warning = FALSE}
+library(dplyr) 
+library(caTools) 
+library(nnet)
+library(class) 
+library(pROC) 
+library(data.table)
+library(readr)
+library(ggplot2)
+library(reshape2)
+```
+<br>
+<h4>Importing and understanding data.</h4>
+```{r, message = FALSE, warning = FALSE}
+
+data <- read.table("D:/Github/ml-assignment/train-io.txt", header = FALSE, sep = " ", dec = ".")
+data <- data %>% rename(response = V13)
+```
+<br>
+I have renamed the last column to 'response' as, the first 12 columns are inputs and the last one is output. 
+<br>
+For data cleaning, I have checked if there are any null values, as well as if the data is normalized.
+```{r, message = FALSE, warning = FALSE}
+isNull <- sum(is.na(data))
+isNull
+summary(data)
+```
+<br>
+So, looks like there are no null values and the variables are normalized as well, as the minimum and maximum values for all the input variables are in considerable range.
+<br>
+Normalization is important while classifying data as, it can affect the results when the distance between two points are considered as a parameter for classification. 
+<br>
+The normalization of the data for input variables can be seen in the below plot.
+```{r, message = FALSE, warning = FALSE}
+ggplot(melt(subset(data,select=-c(response))), aes(x = value)) + geom_density()+facet_wrap(~variable)
+```
+<br>
+<h5>Dividing data into training set and test data set. </h5>
+<br>
+Training set - 75%  Test set - 25%
+```{r, message = FALSE, warning = FALSE}
+sampleSplit <- sample.split(Y=data$response, SplitRatio=0.75)
+trainData <- subset(x=data, sampleSplit==TRUE)
+testData <- subset(x=data, sampleSplit==FALSE)
+```
+
+<br>
+<h4>Applying classification models</h4>
+<br>
+Models Used:
+<br>
+1.Logistic Regression<br>
+2.K nearest Neighbour <br>
+3.Neural Network<br><br>
+
+<h5>1.Logistic Regression</h5>
+```{r logistic, message = FALSE, warning = FALSE}
+
+fit_log<-glm(response~V1+V2+V3+V4+V5+V6+V7+V8+V9+V10+V11+V12, data = trainData,family = binomial)
+res <- predict.glm(fit_log,testData)
+res_log <- ifelse(res > 0.1450, 1, 0)
+paste(mean(res_log == testData$response)*100,"%")
+```
+
+<br>
+<h5>2.KNN</h5>
+```{r knn, message = FALSE, warning = FALSE}
+fit_knn <- knn(train = subset(trainData,select=-c(response)), test = subset(testData,select=-c(response)),cl = trainData$response, k=11)
+paste(mean(fit_knn == testData$response)*100,"%")
+```
+
+<br>
+<h5>3.Neural Network</h5>
+```{r nn , message = FALSE, warning = FALSE}
+fit_nn <- nnet.formula(formula = response~V1+V2+V3+V4+V5+V6+V7+V8+V9+V10+V11+V12, data = trainData, size = 175, linout = FALSE, rang = c(0.7), decay = 0.1, MaxNWts = 2700, maxit = 330)
+res_nn <- predict(fit_nn,testData)
+res_nn <- ifelse(res_nn < 0.5,0,1)
+paste(mean(res_nn == testData$response)*100,"%")
+```
+
+<br>
+<h4>Roc to compare all the models.</h4>
+```{r roc, message = FALSE, warning = FALSE}
+roc_log <- roc(res_log, testData$response)
+roc_knn <- roc(fit_knn, testData$response)
+roc_nn <- roc(res_nn, testData$response)
+
+auc_log <- auc(roc_log)
+auc_knn <- auc(roc_knn)
+auc_nn <- auc(roc_nn)
+
+plot(roc_log, print.auc=TRUE)
+
+lines(roc_knn, col="red", type='b')
+text(0.4, 0.43, labels=sprintf("AUC: %0.3f", auc_knn), col="red")
+
+lines(roc_nn, col="blue", type='b')
+text(0.4, 0.38, labels=sprintf("AUC: %0.3f", auc_nn), col="blue")
+
+legend("bottomright",legend = c("KNN","Logistic","NN"),col = c("red","black","blue"),lty=1:2, cex=0.8)
+```
+
+<br>
+In the case of k-Nearest Neighbors (KNN), a score for a test instance is associated to the proportion of its neighbors belonging to the positive
+class, i.e. class distribution. So, the threshold for KNN is the number of neighbors needed to classify a test instance to a positive class.<br><br>
+<h4>From the above graph, we can see that NN has the highest accuracy.</h4>
+<br>
+
+<br>
+Confusion matrix for final model NN.
+```{r}
+table(res_nn, testData$response)
+
+```
+
+<br>
+<h5>Conclusion</h5>
+Final model selected is NN.
+<br>
+<br>
+Generating output for test data.
+<br>
+```{r}
+test <- read.table("D:/Github/ml-assignment/test-in.txt", header = FALSE, sep = " ", dec = ".")
+res_nn_final <- predict(fit_nn,test)
+res_nn_final <- ifelse(res_nn_final < 0.5,0,1)
+test.in <- c("Manasi Anant Tondulkar",as.vector(res_nn_final))
+
+t4 <- system.time({
+    fwrite(list(test.in), file = "test-out.txt")
+})
+```
