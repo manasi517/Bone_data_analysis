@@ -16,4 +16,5 @@ Objective is to analyze the data and train classifiers to predict the output for
 ## Usage
 * Open .rmd file in RStudio 
 * Install all the required libraries using command - install.packages("package name")
+* Change the data path 
 * Click on the 'Knit' button to generate html file - this will run the whole code inside .rmd file
